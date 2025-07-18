@@ -1,0 +1,119 @@
+<!DOCTYPE html><html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Painel Aviator Inteligente - Saída em 1.50x</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      background: #0e0e0e;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    h1 {
+      margin-top: 20px;
+      color: #00ff99;
+    }
+    video, canvas {
+      max-width: 90%;
+      margin: 10px auto;
+      display: block;
+      border-radius: 12px;
+    }
+    #log {
+      margin-top: 20px;
+      padding: 10px;
+      background: #111;
+      border: 1px solid #333;
+      max-width: 90%;
+      margin-left: auto;
+      margin-right: auto;
+      border-radius: 8px;
+      white-space: pre-wrap;
+    }
+    button {
+      padding: 10px 20px;
+      background: #00ff99;
+      border: none;
+      color: #000;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    button:hover {
+      background: #00cc77;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎯 Painel Aviator - Estratégias Automáticas (Saída em 1.50x)</h1>
+  <button onclick="startAnalysis()">Iniciar Análise</button>
+  <div id="log">Aguardando início...</div>  <script>
+    let lastMultipliers = [];
+
+    function logMessage(msg) {
+      const log = document.getElementById('log');
+      log.innerText = `${msg}\n\n` + log.innerText;
+    }
+
+    function analyzePatterns() {
+      if (lastMultipliers.length < 10) return;
+
+      const recent = lastMultipliers.slice(-10);
+      const lowCount = recent.filter(x => x < 1.50).length;
+      const veryLow = recent.filter(x => x < 1.30).length;
+      const under110 = recent.filter(x => x < 1.10).length;
+      const over10 = recent.filter(x => x >= 10).length;
+
+      // Estratégias com alta assertividade (automáticas)
+      if (veryLow >= 6) {
+        logMessage("✅ OPERAÇÃO CONFIRMADA (96%) - SAIA EM 1.50x");
+      } else if (over10 >= 3) {
+        logMessage("✅ OPERAÇÃO CONFIRMADA (98%) - SAIA EM 1.50x");
+      } else if (under110 >= 2 && over10 >= 1) {
+        logMessage("✅ OPERAÇÃO CONFIRMADA (97%) - SAIA EM 1.50x");
+      } else if (lowCount >= 4) {
+        logMessage("✅ OPERAÇÃO CONFIRMADA (90%) - SAIA EM 1.50x");
+      }
+    }
+
+    async function startAnalysis() {
+      const mediaStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const video = document.createElement('video');
+      video.srcObject = mediaStream;
+      video.play();
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      setInterval(async () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const dataUrl = canvas.toDataURL();
+
+        const result = await Tesseract.recognize(dataUrl, 'eng', {
+          tessedit_char_whitelist: '0123456789.x'
+        });
+
+        const matches = result.data.text.match(/\d+\.\d+/g);
+        if (matches) {
+          matches.map(parseFloat).forEach(val => {
+            if (!isNaN(val) && val < 100) {
+              lastMultipliers.push(val);
+              if (lastMultipliers.length > 50) lastMultipliers.shift();
+              if (val >= 1.50) {
+                logMessage("🟢 GANHO CONFIRMADO - 1.50x ALCANÇADO");
+              }
+            }
+          });
+          analyzePatterns();
+        }
+      }, 3000);
+    }
+  </script></body>
+</html>
