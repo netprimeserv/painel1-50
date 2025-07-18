@@ -68,6 +68,11 @@
     canvasTemp.style.border = '2px solid red';
     document.body.appendChild(canvasTemp);
 
+    let recorteX = 220;
+    let recorteY = 40;
+    let recorteLargura = 800;
+    let recorteAltura = 60;
+
     async function iniciar() {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       video.srcObject = stream;
@@ -75,6 +80,14 @@
       video.onloadedmetadata = () => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
+
+        console.log("Video dimensions:", canvas.width, canvas.height);
+
+        // Ajusta o recorte proporcionalmente à tela capturada
+        recorteX = Math.floor(canvas.width * (220 / 1246));
+        recorteY = Math.floor(canvas.height * (40 / 554));
+        recorteLargura = Math.floor(canvas.width * (800 / 1246));
+        recorteAltura = Math.floor(canvas.height * (60 / 554));
       };
 
       intervalo = setInterval(() => analisar(), 3000);
@@ -87,16 +100,7 @@
     }
 
     function analisar() {
-      const largura = canvas.width;
-      const altura = canvas.height;
-
-      ctx.drawImage(video, 0, 0, largura, altura);
-
-      // Coordenadas ajustadas para capturar apenas a faixa dos multiplicadores
-      const recorteX = 0;
-      const recorteY = 0;
-      const recorteLargura = largura;
-      const recorteAltura = 70;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       ctx.strokeStyle = 'red';
       ctx.lineWidth = 4;
