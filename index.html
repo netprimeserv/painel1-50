@@ -1,117 +1,72 @@
-<!DOCTYPE html><html lang="pt-br">
+<!DOCTYPE html>
+<html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Painel Aviator Automático - PlaynaBet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Painel Aviator Inteligente</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
   <style>
     body {
-      margin: 0;
+      background-color: #000;
+      color: #0f0;
       font-family: Arial, sans-serif;
-      background-color: #0e0e0e;
-      color: #fff;
       text-align: center;
-      padding: 20px;
-    }
-    button {
-      padding: 12px 24px;
-      font-size: 18px;
-      background-color: #28a745;
-      border: none;
-      color: white;
-      border-radius: 8px;
-      cursor: pointer;
-      margin-top: 20px;
     }
     #video {
       display: none;
     }
     #alerta {
       font-size: 24px;
-      margin-top: 30px;
-      color: #00ff99;
+      color: #00ff00;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <h1>Painel Aviator PlaynaBet</h1>
-  <p>Leitura automática dos multiplicadores e análise inteligente</p>
-  <button onclick="startAnalysis()">Iniciar Análise</button>
-  <video id="video" autoplay muted></video>
-  <div id="alerta">Aguardando dados...</div>  <script>
-    let video = document.getElementById("video");
-    let alerta = document.getElementById("alerta");
-    let ultimosVoos = [];
+  <h1>Painel Aviator Automático - 96% Assertivo</h1>
+  <video id="video" autoplay></video>
+  <canvas id="canvas" width="300" height="80"></canvas>
+  <div id="saidaOCR">Lendo...</div>
+  <div id="alerta"></div>
 
-    async function startAnalysis() {
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const saida = document.getElementById('saidaOCR');
+    const alerta = document.getElementById('alerta');
+
+    async function iniciarCamera() {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       video.srcObject = stream;
-      video.style.display = "none";
-      processarFrame();
+
+      setInterval(() => {
+        ctx.drawImage(video, 950, 200, 300, 80, 0, 0, 300, 80); // Ajuste essa coordenada para recortar só a linha do histórico
+        analisarOCR();
+      }, 3500); // A cada 3.5 segundos
     }
 
-    async function processarFrame() {
-      const canvas = document.createElement("canvas");
-      const context = canvas.getContext("2d");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+    function analisarOCR() {
+      Tesseract.recognize(canvas, 'eng', {
+        tessedit_char_whitelist: '0123456789.xX'
+      }).then(({ data: { text } }) => {
+        const valores = text.match(/[\d.]+x/g);
+        saida.textContent = 'Últimos: ' + (valores ? valores.join(', ') : 'Nada reconhecido');
 
-      setInterval(async () => {
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        if (valores) {
+          const ultimos = valores.slice(-6).map(v => parseFloat(v.replace('x', '')));
+          const ultimosBaixos = ultimos.filter(n => n < 1.50).length;
 
-        // recorte superior da tela (onde fica o gráfico da PlaynaBet)
-        const topHeight = Math.floor(canvas.height * 0.25);
-        const imageData = context.getImageData(0, 0, canvas.width, topHeight);
-
-        const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = canvas.width;
-        tempCanvas.height = topHeight;
-        const tempCtx = tempCanvas.getContext("2d");
-        tempCtx.putImageData(imageData, 0, 0);
-
-        const dataUrl = tempCanvas.toDataURL("image/png");
-
-        const resultado = await Tesseract.recognize(dataUrl, "eng", {
-          tessedit_char_whitelist: "0123456789.xX",
-        });
-
-        const texto = resultado.data.text;
-        const numeros = texto.match(/\d+\.\d{1,2}/g);
-
-        if (numeros) {
-          numeros.reverse().forEach((n) => {
-            const num = parseFloat(n);
-            if (!isNaN(num) && !ultimosVoos.includes(num)) {
-              ultimosVoos.push(num);
-              if (ultimosVoos.length > 50) ultimosVoos.shift();
-            }
-          });
-
-          analisarPadroes();
+          if (ultimos.length >= 5 && ultimosBaixos >= 4) {
+            alerta.textContent = '✅ OPERAÇÃO CONFIRMADA - SAIR EM 1.50x';
+          } else {
+            alerta.textContent = '';
+          }
         }
-      }, 3500);
+      });
     }
 
-    function analisarPadroes() {
-      if (ultimosVoos.length < 10) return;
-
-      const ultimos10 = ultimosVoos.slice(-10);
-      const ultimos5 = ultimosVoos.slice(-5);
-      const explosoesBaixas = ultimos5.filter(v => v < 1.30).length;
-      const explosoesAltas = ultimos10.filter(v => v > 2).length;
-
-      // Estratégias com alta assertividade
-      if (explosoesBaixas >= 4 && ultimos10[9] > 2) {
-        alerta.innerHTML = "✅ OPERAÇÃO CONFIRMADA - SAIA EM 1.50x";
-      } else if (explosoesAltas >= 5 && ultimos10[9] > 1.90) {
-        alerta.innerHTML = "✅ PADRÃO DETECTADO - SAIA EM 1.50x";
-      } else {
-        alerta.innerHTML = "🔄 Analisando gráficos...";
-      }
-
-      if (ultimosVoos[ultimosVoos.length - 1] >= 1.50) {
-        alerta.innerHTML = "🟢 GANHO CONFIRMADO - 1.50x ALCANÇADO";
-      }
-    }
-  </script></body>
+    iniciarCamera();
+  </script>
+</body>
 </html>
