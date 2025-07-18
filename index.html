@@ -51,7 +51,7 @@
   <button onclick="parar()">Parar Análise</button>
   <div id="alerta">Aguardando início...</div>
   <video id="video" autoplay></video>
-  <canvas id="canvas" width="1280" height="720"></canvas>
+  <canvas id="canvas"></canvas>
 
   <script>
     const video = document.getElementById('video');
@@ -72,7 +72,12 @@
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       video.srcObject = stream;
 
-      intervalo = setInterval(() => analisar(), 3000); // a cada 3 segundos
+      video.onloadedmetadata = () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      };
+
+      intervalo = setInterval(() => analisar(), 3000);
     }
 
     function parar() {
@@ -87,11 +92,11 @@
 
       ctx.drawImage(video, 0, 0, largura, altura);
 
-      // Coordenadas ajustadas conforme imagem enviada
-      const recorteX = 20;
-      const recorteY = 80;
-      const recorteLargura = 900;
-      const recorteAltura = 150;
+      // Coordenadas ajustadas para capturar apenas a faixa dos multiplicadores
+      const recorteX = 0;
+      const recorteY = 0;
+      const recorteLargura = largura;
+      const recorteAltura = 70;
 
       ctx.strokeStyle = 'red';
       ctx.lineWidth = 4;
@@ -127,8 +132,11 @@
     function aplicarFiltroPretoBranco(ctxTemp, canvasTemp) {
       const imgData = ctxTemp.getImageData(0, 0, canvasTemp.width, canvasTemp.height);
       for (let i = 0; i < imgData.data.length; i += 4) {
-        const avg = (imgData.data[i] + imgData.data[i + 1] + imgData.data[i + 2]) / 3;
-        const val = avg > 150 ? 255 : 0;
+        const r = imgData.data[i];
+        const g = imgData.data[i + 1];
+        const b = imgData.data[i + 2];
+        const max = Math.max(r, g, b);
+        const val = max > 180 ? 255 : 0;
         imgData.data[i] = val;
         imgData.data[i + 1] = val;
         imgData.data[i + 2] = val;
