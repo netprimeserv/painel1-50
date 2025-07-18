@@ -2,71 +2,40 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Painel Aviator Automático</title>
+  <title>Leitor de Multiplicadores Aviator</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
   <style>
     body {
       margin: 0;
+      background-color: #000;
+      color: #00ffcc;
       font-family: Arial, sans-serif;
-      background-color: #0f0f0f;
-      color: #fff;
-      text-align: center;
-      padding-top: 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
     }
 
-    #alerta {
-      font-size: 24px;
-      color: #00ff00;
-      margin-top: 20px;
+    #multiplicadores {
+      font-size: 32px;
       font-weight: bold;
-    }
-
-    video {
-      width: 400px;
-      height: auto;
       margin-top: 20px;
-      border: 2px solid #00ffcc;
-      border-radius: 10px;
     }
 
     canvas {
       display: none;
     }
-
-    button {
-      padding: 10px 20px;
-      margin: 5px;
-      background-color: #00ffcc;
-      color: #000;
-      border: none;
-      border-radius: 8px;
-      font-size: 18px;
-      cursor: pointer;
-    }
   </style>
 </head>
 <body>
-  <h1>Painel Aviator - Leitura Automática</h1>
-  <button onclick="iniciar()">Iniciar Análise</button>
-  <button onclick="parar()">Parar Análise</button>
-  <div id="alerta">Aguardando início...</div>
-  <video id="video" autoplay></video>
+  <div id="multiplicadores">Aguardando leitura...</div>
   <canvas id="canvas"></canvas>
 
   <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const alerta = document.getElementById('alerta');
-    const ctx = canvas.getContext('2d');
-    let intervalo;
-
-    const canvasTemp = document.createElement('canvas');
-    const ctxTemp = canvasTemp.getContext('2d');
-    canvasTemp.style.position = 'absolute';
-    canvasTemp.style.top = '10px';
-    canvasTemp.style.left = '10px';
-    canvasTemp.style.border = '2px solid red';
-    document.body.appendChild(canvasTemp);
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const painel = document.getElementById("multiplicadores");
 
     let recorteX = 220;
     let recorteY = 40;
@@ -75,39 +44,30 @@
 
     async function iniciar() {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const video = document.createElement("video");
       video.srcObject = stream;
+      video.play();
 
       video.onloadedmetadata = () => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
-        console.log("Video dimensions:", canvas.width, canvas.height);
-
-        // Ajusta o recorte proporcionalmente à tela capturada
         recorteX = Math.floor(canvas.width * (220 / 1246));
         recorteY = Math.floor(canvas.height * (40 / 554));
         recorteLargura = Math.floor(canvas.width * (800 / 1246));
         recorteAltura = Math.floor(canvas.height * (60 / 554));
+
+        setInterval(() => analisar(video), 3000);
       };
-
-      intervalo = setInterval(() => analisar(), 3000);
     }
 
-    function parar() {
-      clearInterval(intervalo);
-      alerta.innerText = "Análise pausada";
-      alerta.style.color = "#ff0000";
-    }
-
-    function analisar() {
+    function analisar(video) {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      ctx.strokeStyle = 'red';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(recorteX, recorteY, recorteLargura, recorteAltura);
 
       const imageData = ctx.getImageData(recorteX, recorteY, recorteLargura, recorteAltura);
 
+      const canvasTemp = document.createElement("canvas");
+      const ctxTemp = canvasTemp.getContext("2d");
       canvasTemp.width = recorteLargura;
       canvasTemp.height = recorteAltura;
       ctxTemp.putImageData(imageData, 0, 0);
@@ -117,17 +77,8 @@
       Tesseract.recognize(canvasTemp, 'eng', {
         tessedit_char_whitelist: '0123456789.xX'
       }).then(({ data: { text } }) => {
-        const resultados = text.match(/[\d.]+x/g) || [];
-        const ultimos = resultados.slice(-4).map(val => parseFloat(val.replace('x', ''))).filter(v => !isNaN(v));
-
-        if (ultimos.length >= 4) {
-          const chanceAlta = detectarPadraoSeguro(ultimos);
-          alerta.innerText = chanceAlta ? "✅ ENTRADA CONFIRMADA - SAIR EM 1.50x" : "Aguardando oportunidade...";
-          alerta.style.color = chanceAlta ? "#00ff00" : "#fff";
-        } else {
-          alerta.innerText = "Aguardando leitura...";
-          alerta.style.color = "#fff";
-        }
+        const resultados = (text.match(/[\d.]+x/g) || []).join(" | ");
+        painel.innerText = resultados ? `Multiplicadores: ${resultados}` : "Aguardando leitura...";
       }).catch(err => {
         console.error("Erro OCR:", err);
       });
@@ -136,24 +87,14 @@
     function aplicarFiltroPretoBranco(ctxTemp, canvasTemp) {
       const imgData = ctxTemp.getImageData(0, 0, canvasTemp.width, canvasTemp.height);
       for (let i = 0; i < imgData.data.length; i += 4) {
-        const r = imgData.data[i];
-        const g = imgData.data[i + 1];
-        const b = imgData.data[i + 2];
-        const max = Math.max(r, g, b);
+        const max = Math.max(imgData.data[i], imgData.data[i + 1], imgData.data[i + 2]);
         const val = max > 180 ? 255 : 0;
-        imgData.data[i] = val;
-        imgData.data[i + 1] = val;
-        imgData.data[i + 2] = val;
+        imgData.data[i] = imgData.data[i + 1] = imgData.data[i + 2] = val;
       }
       ctxTemp.putImageData(imgData, 0, 0);
     }
 
-    function detectarPadraoSeguro(arr) {
-      const explosaoBaixa = arr.filter(v => v < 1.50).length >= 3;
-      const mixAltoBaixo = arr.filter(v => v < 1.40).length == 2 && arr.some(v => v > 2.5);
-      const todosBaixos = arr.every(v => v < 2.0);
-      return explosaoBaixa || mixAltoBaixo || todosBaixos;
-    }
+    iniciar();
   </script>
 </body>
 </html>
