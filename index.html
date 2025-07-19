@@ -2,61 +2,46 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Leitor de Multiplicadores Aviator</title>
+  <title>Multiplicadores Aviator - Somente Faixa</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
   <style>
     body {
       margin: 0;
-      background-color: #000;
+      background: #000;
       color: #00ffcc;
       font-family: Arial, sans-serif;
       display: flex;
-      flex-direction: column;
-      align-items: center;
       justify-content: center;
+      align-items: center;
       height: 100vh;
+      text-align: center;
     }
-
-    #multiplicadores {
-      font-size: 32px;
-      font-weight: bold;
-      margin-top: 20px;
-    }
-
-    canvas {
-      display: none;
+    #resultado {
+      font-size: 28px;
+      max-width: 90%;
+      word-break: break-word;
     }
   </style>
 </head>
 <body>
-  <div id="multiplicadores">Aguardando leitura...</div>
-  <canvas id="canvas"></canvas>
+  <div id="resultado">Aguardando leitura dos multiplicadores...</div>
+
+  <canvas id="canvas" style="display:none;"></canvas>
 
   <script>
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
-    const painel = document.getElementById("multiplicadores");
-
-    let recorteX = 220;
-    let recorteY = 40;
-    let recorteLargura = 800;
-    let recorteAltura = 60;
+    const resultado = document.getElementById("resultado");
 
     async function iniciar() {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       const video = document.createElement("video");
       video.srcObject = stream;
-      video.play();
+      await video.play();
 
       video.onloadedmetadata = () => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-
-        recorteX = Math.floor(canvas.width * (220 / 1246));
-        recorteY = Math.floor(canvas.height * (40 / 554));
-        recorteLargura = Math.floor(canvas.width * (800 / 1246));
-        recorteAltura = Math.floor(canvas.height * (60 / 554));
-
         setInterval(() => analisar(video), 3000);
       };
     }
@@ -64,12 +49,18 @@
     function analisar(video) {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+      // Ajustado para o tamanho da imagem de exemplo que você mandou
+      const recorteX = 0;
+      const recorteY = 0;
+      const recorteLargura = canvas.width;
+      const recorteAltura = Math.floor(canvas.height * (80 / 365));
+
       const imageData = ctx.getImageData(recorteX, recorteY, recorteLargura, recorteAltura);
 
       const canvasTemp = document.createElement("canvas");
-      const ctxTemp = canvasTemp.getContext("2d");
       canvasTemp.width = recorteLargura;
       canvasTemp.height = recorteAltura;
+      const ctxTemp = canvasTemp.getContext("2d");
       ctxTemp.putImageData(imageData, 0, 0);
 
       aplicarFiltroPretoBranco(ctxTemp, canvasTemp);
@@ -78,9 +69,7 @@
         tessedit_char_whitelist: '0123456789.xX'
       }).then(({ data: { text } }) => {
         const resultados = (text.match(/[\d.]+x/g) || []).join(" | ");
-        painel.innerText = resultados ? `Multiplicadores: ${resultados}` : "Aguardando leitura...";
-      }).catch(err => {
-        console.error("Erro OCR:", err);
+        resultado.innerText = resultados ? `Multiplicadores: ${resultados}` : "Aguardando leitura...";
       });
     }
 
