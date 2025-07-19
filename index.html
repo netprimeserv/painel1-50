@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Multiplicadores Aviator - Somente Faixa</title>
+  <title>Painel Aviator Automático</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
   <style>
     body {
@@ -11,20 +11,27 @@
       color: #00ffcc;
       font-family: Arial, sans-serif;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       height: 100vh;
       text-align: center;
     }
-    #resultado {
-      font-size: 28px;
+    #resultado, #sinal {
+      font-size: 24px;
+      margin-top: 20px;
       max-width: 90%;
       word-break: break-word;
+    }
+    #sinal {
+      color: #00ff00;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
   <div id="resultado">Aguardando leitura dos multiplicadores...</div>
+  <div id="sinal"></div>
 
   <canvas id="canvas" style="display:none;"></canvas>
 
@@ -32,6 +39,9 @@
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
     const resultado = document.getElementById("resultado");
+    const sinal = document.getElementById("sinal");
+
+    let historico = [];
 
     async function iniciar() {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
@@ -49,14 +59,12 @@
     function analisar(video) {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // Ajustado para o tamanho da imagem de exemplo que você mandou
       const recorteX = 0;
       const recorteY = 0;
       const recorteLargura = canvas.width;
       const recorteAltura = Math.floor(canvas.height * (80 / 365));
 
       const imageData = ctx.getImageData(recorteX, recorteY, recorteLargura, recorteAltura);
-
       const canvasTemp = document.createElement("canvas");
       canvasTemp.width = recorteLargura;
       canvasTemp.height = recorteAltura;
@@ -68,8 +76,16 @@
       Tesseract.recognize(canvasTemp, 'eng', {
         tessedit_char_whitelist: '0123456789.xX'
       }).then(({ data: { text } }) => {
-        const resultados = (text.match(/[\d.]+x/g) || []).join(" | ");
-        resultado.innerText = resultados ? `Multiplicadores: ${resultados}` : "Aguardando leitura...";
+        const encontrados = (text.match(/[\d.]+x/g) || []).map(e => e.replace('x', ''));
+        if (encontrados.length > 0) {
+          resultado.innerText = "Multiplicadores: " + encontrados.join(" | ");
+          atualizarHistorico(encontrados);
+          const entrada = analisarPadroes(historico);
+          sinal.innerText = entrada ? entrada : "";
+        } else {
+          resultado.innerText = "Aguardando leitura...";
+          sinal.innerText = "";
+        }
       });
     }
 
@@ -81,6 +97,42 @@
         imgData.data[i] = imgData.data[i + 1] = imgData.data[i + 2] = val;
       }
       ctxTemp.putImageData(imgData, 0, 0);
+    }
+
+    function atualizarHistorico(novos) {
+      historico.push(...novos.map(e => parseFloat(e)));
+      if (historico.length > 30) historico = historico.slice(-30);
+    }
+
+    function analisarPadroes(lista) {
+      if (lista.length < 6) return null;
+
+      const ultimos4 = lista.slice(-4);
+      const ultimos5 = lista.slice(-5);
+      const ultimos6 = lista.slice(-6);
+
+      const baixos4 = ultimos4.filter(n => n < 1.40).length;
+      const muitoBaixos5 = ultimos5.filter(n => n < 1.30).length;
+      const extremos5 = ultimos5.filter(n => n < 1.20).length;
+      const extremos6 = ultimos6.filter(n => n < 1.10).length;
+
+      if (baixos4 >= 3) {
+        return "✅ ENTRADA - 90% CONFIRMADA - SAIR EM 1.50x";
+      }
+
+      if (muitoBaixos5 >= 4) {
+        return "✅ ENTRADA - 92% SEGURA - SAIR EM 1.50x";
+      }
+
+      if (extremos5 === 5) {
+        return "✅ ENTRADA - 96% CRÍTICA - SAIR EM 1.50x";
+      }
+
+      if (extremos6 === 6) {
+        return "✅ ENTRADA - 98% RARA - SAIR EM 1.50x";
+      }
+
+      return null;
     }
 
     iniciar();
