@@ -1,93 +1,202 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Aviator Multiplicadores</title>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
+  <title>Aviator - Detector de Entrada (OCR)</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.1/dist/tesseract.min.js"></script>
   <style>
     body {
-      margin: 0;
-      background: #000;
-      color: #00ffcc;
+      background: #111;
+      color: #fff;
       font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    h1 {
+      color: #00ff88;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-bottom: 20px;
+      background: #00ff88;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .painel {
       display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      text-align: center;
+      gap: 30px;
     }
-    #resultado {
-      font-size: 26px;
-      max-width: 90%;
-      word-break: break-word;
+    .historico, .sinal {
+      background: #222;
+      padding: 20px;
+      border-radius: 10px;
+      width: 45%;
     }
-    video, canvas {
-      display: none;
+    .multiplicadores {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .multi {
+      padding: 10px 15px;
+      border-radius: 8px;
+      font-size: 18px;
+      color: #fff;
+    }
+    .baixo { background: #1e90ff; }
+    .medio { background: #8a2be2; }
+    .alto  { background: #ff69b4; }
+    .alerta {
+      font-size: 24px;
+      font-weight: bold;
+      color: #00ff88;
+      margin-top: 15px;
+    }
+    .resultado {
+      margin-top: 20px;
+      font-size: 22px;
+      font-weight: bold;
+    }
+    .green { color: #00ff88; }
+    .red { color: #ff4444; }
+    .contador {
+      margin-top: 15px;
+      font-size: 20px;
     }
   </style>
 </head>
 <body>
-  <div id="resultado">Aguardando leitura...</div>
+  <h1>🚁 Aviator - Leitura Automática (OCR)</h1>
+  <button onclick="iniciarCaptura()">Iniciar Captura</button>
 
-  <video id="video" autoplay></video>
-  <canvas id="canvas"></canvas>
+  <div class="painel">
+    <div class="historico">
+      <h2>Multiplicadores Reais</h2>
+      <div class="multiplicadores" id="historico"></div>
+    </div>
+    <div class="sinal">
+      <h2>Sinal de Entrada</h2>
+      <div id="sinal">Aguardando leitura...</div>
+      <div class="resultado" id="resultado"></div>
+      <div class="contador">
+        🟢 Vitórias: <span class="green" id="greenCount">0</span><br>
+        🔴 Derrotas: <span class="red" id="redCount">0</span>
+      </div>
+    </div>
+  </div>
 
   <script>
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-    const video = document.getElementById("video");
-    const resultado = document.getElementById("resultado");
+    const historicoDOM = document.getElementById('historico');
+    const sinalDOM = document.getElementById('sinal');
+    const resultadoDOM = document.getElementById('resultado');
+    const greenCountDOM = document.getElementById('greenCount');
+    const redCountDOM = document.getElementById('redCount');
 
-    async function iniciar() {
+    let historico = [];
+    let aguardandoResultado = false;
+    let entradaMultiplicador = null;
+
+    function atualizarContadoresDOM() {
+      greenCountDOM.innerText = localStorage.getItem('greenCount') || 0;
+      redCountDOM.innerText = localStorage.getItem('redCount') || 0;
+    }
+
+    async function iniciarCaptura() {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const video = document.createElement('video');
       video.srcObject = stream;
+      video.play();
 
-      video.onloadedmetadata = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      setInterval(async () => {
         canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        setInterval(analisar, 3000);
-      };
+        canvas.height = 120;
+        ctx.drawImage(video, 0, 0, video.videoWidth, 120, 0, 0, canvas.width, canvas.height);
+
+        const { data: { text } } = await Tesseract.recognize(canvas, 'eng');
+        const match = text.match(/\d+\.\d+/);
+
+        if (match) {
+          const valor = parseFloat(match[0]);
+          if (!isNaN(valor)) {
+            atualizarPainelComValor(valor);
+          }
+        }
+      }, 3000);
     }
 
-    function analisar() {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    function atualizarPainelComValor(novo) {
+      historico.unshift(novo);
+      if (historico.length > 20) historico.pop();
 
-      const recorteX = Math.floor(canvas.width * 0.05);
-      const recorteY = Math.floor(canvas.height * 0.03);
-      const recorteLargura = Math.floor(canvas.width * 0.90);
-      const recorteAltura = Math.floor(canvas.height * 0.10);
-
-      const imageData = ctx.getImageData(recorteX, recorteY, recorteLargura, recorteAltura);
-
-      const canvasTemp = document.createElement("canvas");
-      const ctxTemp = canvasTemp.getContext("2d");
-      canvasTemp.width = recorteLargura;
-      canvasTemp.height = recorteAltura;
-      ctxTemp.putImageData(imageData, 0, 0);
-
-      aplicarFiltroPretoBranco(ctxTemp, canvasTemp);
-
-      Tesseract.recognize(canvasTemp, 'eng', {
-        tessedit_char_whitelist: '0123456789.xX'
-      }).then(({ data: { text } }) => {
-        const resultados = (text.match(/[\d.]+x/g) || []).join(" | ");
-        resultado.innerText = resultados ? resultados : "Aguardando leitura...";
-      }).catch(() => {
-        resultado.innerText = "Aguardando leitura...";
+      historicoDOM.innerHTML = '';
+      historico.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'multi';
+        if (m < 2) div.classList.add('baixo');
+        else if (m < 10) div.classList.add('medio');
+        else div.classList.add('alto');
+        div.innerText = m + 'x';
+        historicoDOM.appendChild(div);
       });
+
+      analisarSinal();
+      verificarResultado();
     }
 
-    function aplicarFiltroPretoBranco(ctxTemp, canvasTemp) {
-      const imgData = ctxTemp.getImageData(0, 0, canvasTemp.width, canvasTemp.height);
-      for (let i = 0; i < imgData.data.length; i += 4) {
-        const max = Math.max(imgData.data[i], imgData.data[i + 1], imgData.data[i + 2]);
-        const val = max > 160 ? 255 : 0;
-        imgData.data[i] = imgData.data[i + 1] = imgData.data[i + 2] = val;
+    function analisarSinal() {
+      let sinal = 'Aguardando leitura...';
+
+      if (!aguardandoResultado && historico.length >= 6) {
+        const [m0, m1, m2, m3, m4, m5] = historico;
+
+        const media5 = (m1 + m2 + m3 + m4 + m5) / 5;
+        const marcarEntrada = (msg) => {
+          sinal = '✅ ENTRADA CONFIRMADA — Entrar após o ' + m0 + 'x';
+          if (msg) sinal += '<br><small>' + msg + '</small>';
+          aguardandoResultado = true;
+          entradaMultiplicador = m0;
+        };
+
+        if (m1 < 2 && m2 < 2 && m3 < 2) marcarEntrada();
+        else if (m4 < 2 && m3 > 2 && m2 < 2 && m1 > 2) marcarEntrada('Estratégia alternada');
+        else if ([m1, m2, m3].every(v => v > 2 && v < 3)) marcarEntrada('Estratégia de médias');
+        else if (m1 > 5 && m2 > 5 && m3 > 5 && m4 < 2) marcarEntrada('Correção pós-altas');
+        else if (m1 === 1.2 && m2 === 2.0 && m3 >= 3.0 && m0 >= 1.5 && m0 <= 2.5) marcarEntrada('Padrão degrau');
+        else if (media5 >= 3 && m1 < 2 && m2 < 2) marcarEntrada('Média alta com correção');
+        else if (m3 >= 5 && m2 < 2 && m1 >= 5) marcarEntrada('Alto-baixo-alto');
+        else if ((m1 < 2 && m2 < 2) || (m2 < 2 && m3 < 2)) sinal = '⚠️ Possível oportunidade...';
       }
-      ctxTemp.putImageData(imgData, 0, 0);
+
+      sinalDOM.innerHTML = `<div class="alerta">${sinal}</div>`;
     }
 
-    iniciar();
+    function verificarResultado() {
+      if (aguardandoResultado && historico.length >= 2) {
+        const resultado = historico[0];
+        const anterior = historico[1];
+        if (resultado !== entradaMultiplicador) {
+          if (resultado >= 1.5) {
+            resultadoDOM.innerHTML = '<span class="green">🟢 GREEN — Lucro com ' + resultado + 'x</span>';
+            let g = parseInt(localStorage.getItem('greenCount') || '0');
+            localStorage.setItem('greenCount', ++g);
+          } else {
+            resultadoDOM.innerHTML = '<span class="red">🔴 RED — Perda com ' + resultado + 'x</span>';
+            let r = parseInt(localStorage.getItem('redCount') || '0');
+            localStorage.setItem('redCount', ++r);
+          }
+          atualizarContadoresDOM();
+          aguardandoResultado = false;
+        }
+      } else {
+        resultadoDOM.innerHTML = '';
+      }
+    }
+
+    atualizarContadoresDOM();
   </script>
 </body>
 </html>
